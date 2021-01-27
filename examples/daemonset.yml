@@ -1,10 +1,15 @@
 ---
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: dummy-device-daemonset
+  name: fake-device-plugin
   namespace: kube-system
+  labels:
+    app: fake-device-plugin
 spec:
+  selector:
+    matchLabels:
+      app: fake-device-plugin
   template:
     metadata:
       # Mark this pod as a critical add-on; when enabled, the critical add-on scheduler
@@ -13,8 +18,10 @@ spec:
       annotations:
         scheduler.alpha.kubernetes.io/critical-pod: ""
       labels:
-        name: dummy-device-plugin-ds
+        app: fake-device-plugin
     spec:
+      nodeSelector:
+        fake-device-plugin: 'true'
       tolerations:
       # Allow this pod to be rescheduled while the node is in "critical add-ons only" mode.
       # This, along with the annotation above marks this pod as a critical add-on.
@@ -22,8 +29,8 @@ spec:
         operator: Exists
       hostNetwork: true
       containers:
-      - image: nfvpe/dummy-device-plugin:latest
-        name: dummy-device-plugin-ctr
+      - image: yehiyam/fake-device-plugin:0.0.2
+        name: fake-device-plugin
         # args: ["-log-level", "debug"]
         # --------- Doug removed this section.
         # securityContext:
@@ -33,7 +40,30 @@ spec:
         volumeMounts:
           - name: device-plugin
             mountPath: /var/lib/kubelet/device-plugins
+          - name: config
+            mountPath: /dummyResources.json
+            subPath: dummyResources.json
       volumes:
         - name: device-plugin
           hostPath:
             path: /var/lib/kubelet/device-plugins
+        - name: config
+          configMap:
+            name: fake-device-plugin-cm
+            items:
+              - key: dummyResources.json
+                path: dummyResources.json
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fake-device-plugin-cm
+  namespace: kube-system
+data:
+  dummyResources.json: |
+          [
+            {
+                "name": "dev_1",
+                "state": "Up"
+            }
+          ]
